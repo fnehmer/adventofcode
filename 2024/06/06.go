@@ -1,157 +1,158 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
-    "bufio"
-    "strings"
+	"strings"
 )
 
 type coord struct {
-    x   int
-    y   int
+	x int
+	y int
+}
+
+func (c coord) Equal(other coord) bool {
+	return c.x == other.x && c.y == other.y
+}
+
+func contains(slice []coord, target coord) bool {
+	for _, item := range slice {
+		if item.Equal(target) {
+			return true
+		}
+	}
+	return false
 }
 
 func checkError(e error) {
-    if e != nil {
-        panic(e)
-    }
+	if e != nil {
+		panic(e)
+	}
 }
 
 func readInput() ([][]string, coord) {
-    playing_field := [][]string{}
+	playing_field := [][]string{}
 
-    file, err := os.Open("./input")
-    checkError(err)
-    defer file.Close()
-    scanner := bufio.NewScanner(file)
-    r_idx := 0
-    player_start := coord{x: -1, y: -1}
+	file, err := os.Open("./input")
+	checkError(err)
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	r_idx := 0
+	player_start := coord{x: -1, y: -1}
 
-    for scanner.Scan() {
-        line := strings.TrimSpace(scanner.Text())
-        row := []string{}
-        for c_idx, c := range line {
-            row = append(row, string(c))
-            if string(c) == "^" {
-                player_start = coord{x: c_idx, y: r_idx}
-            }
-        }
-        playing_field = append(playing_field, row)
-        r_idx++
-    }
-    checkError(scanner.Err())
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		row := []string{}
+		for c_idx, c := range line {
+			row = append(row, string(c))
+			if string(c) == "^" {
+				player_start = coord{x: c_idx, y: r_idx}
+			}
+		}
+		playing_field = append(playing_field, row)
+		r_idx++
+	}
+	checkError(scanner.Err())
 
-    return playing_field, player_start
+	return playing_field, player_start
 }
 
-func searchInDirection(playing_field [][]string, word string, x_pos int, y_pos int, direction [2]int) bool {
-    if (playing_field[y_pos][x_pos] != string(word[0])) {
-        return false
-    }
+// -> ( 1, 0)
+//  v ( 0, 1)
+// <- (-1, 0)
+//  ^ ( 0,-1)
 
-    dir_row, dir_col := direction[0], direction[1]
+func explore_next_step(playing_field [][]string, cur_pos coord, direction coord) (string, coord, coord) {
+	// out of bound
+	next_pos := coord{cur_pos.x + direction.x, cur_pos.y + direction.y}
+	if next_pos.y < 0 || next_pos.y >= len(playing_field) || next_pos.x < 0 || next_pos.x >= len(playing_field[next_pos.y]) {
+		return "end", cur_pos, direction
+	}
 
-    for i := 0; i < len(word); i++ {
-       // check out of bounds
-       if x_pos + (i*dir_col) < 0 || x_pos + (i*dir_col) > (len(playing_field[0]) - 1) || y_pos + (i*dir_row) < 0 || y_pos + (i*dir_row) > (len(playing_field) - 1) {
-            return false
-       }
+	if playing_field[next_pos.y][next_pos.x] == "." || playing_field[next_pos.y][next_pos.x] == "^" {
+		return ".", coord{next_pos.x, next_pos.y}, direction
+	} else if playing_field[next_pos.y][next_pos.x] == "#" {
+		new_direction := coord{-direction.y, direction.x}
+		return "#", cur_pos, new_direction
+	}
 
-       // check letter
-       if playing_field[y_pos + (i*dir_row)][x_pos + (i*dir_col)] != string(word[i]) {
-            return false
-       }
-    }    
-
-    return true
+	return "error", cur_pos, direction
 }
 
-func countOccurences(playing_field [][]string, isA bool) int {
-    directions := [8][2]int{
-        {-1, 0},  // N 
-        {1, 0},   // S 
-        {0, -1},  // W 
-        {0, 1},   // O 
-        {-1, -1}, // NW
-        {-1, 1},  // NO
-        {1, -1},  // SW
-        {1, 1},   // SO
-    }
+func a() (int, []coord) {
+	playing_field, player_pos := readInput()
+	out_of_bound := false
+	visited := []coord{}
+	// Starting Pos
+	visited = append(visited, player_pos)
 
-    rows := len(playing_field)
-    cols := len(playing_field[0])
-    sum := 0
+	cell := "^"
+	pos := player_pos
+	dir := coord{0, -1}
 
-    for r := 0; r < rows; r++ {
-        for c := 0; c < cols; c++ {
-                if isA {
-                    for _, d := range directions {
-                        if searchInDirection(playing_field, "XMAS", c, r, d) {
-                            sum++
-                        }
-                    }
-                } else {
-                    if searchCrossMAS(playing_field, c, r) {
-                        sum++
-                    }
-                }
-            }  
-        }
-        return sum
-    }
+	for !out_of_bound {
+		cell, pos, dir = explore_next_step(playing_field, pos, dir)
+		if cell == "." {
+			if !contains(visited, pos) {
+				visited = append(visited, pos)
+			}
+		} else if cell == "end" {
+			out_of_bound = true
+		}
+	}
 
-
-func printPattern(playing_field [][]string, x_pos int, y_pos int) {
-    fmt.Println("---")
-    for i := 0; i < 3; i++ {
-        for j := 0; j < 3; j++ {
-            fmt.Print(playing_field[i+y_pos][j+x_pos])
-        }
-        fmt.Print("\n") 
-    }
-    fmt.Println("---")
+	return len(visited), visited
 }
 
-func searchCrossMAS(playing_field [][]string, x_pos int, y_pos int) bool {
-    if playing_field[y_pos][x_pos] == "M" {
-        return  (
-                len(playing_field) - 1 >= y_pos + 2 &&
-                len(playing_field[0]) - 1 >= x_pos + 2 &&
-                playing_field[y_pos][x_pos+2] == "M" &&
-                playing_field[y_pos+1][x_pos+1] == "A" &&
-                playing_field[y_pos+2][x_pos] == "S" &&
-                playing_field[y_pos+2][x_pos+2] == "S") ||
-                (
-                len(playing_field) - 1 >= y_pos + 2 &&
-                len(playing_field[0]) - 1 >= x_pos + 2 &&
-                playing_field[y_pos][x_pos+2] == "S" &&
-                playing_field[y_pos+1][x_pos+1] == "A" &&
-                playing_field[y_pos+2][x_pos] == "M" &&
-                playing_field[y_pos+2][x_pos+2] == "S")
+func testObstacles(path []coord) int {
+	playing_field, player_pos := readInput()
+	path = path[1:]
+	loops := 0
 
-    } else if playing_field[y_pos][x_pos] == "S" {
-        return (len(playing_field) - 1 >= y_pos + 2 &&
-               len(playing_field[0]) - 1 >= x_pos + 1 &&
-               len(playing_field[0]) - 1 >= x_pos + 2 &&
-               playing_field[y_pos][x_pos+2] == "S" &&
-               playing_field[y_pos+1][x_pos+1] == "A" &&
-               playing_field[y_pos+2][x_pos] == "M" &&
-               playing_field[y_pos+2][x_pos+2] == "M") ||
-               (
-                len(playing_field) - 1 >= y_pos + 2 &&
-                len(playing_field[0]) - 1 >= x_pos + 2 &&
-                playing_field[y_pos][x_pos+2] == "M" &&
-                playing_field[y_pos+1][x_pos+1] == "A" &&
-                playing_field[y_pos+2][x_pos] == "S" &&
-                playing_field[y_pos+2][x_pos+2] == "M")
-    } else {
-        return false
-    }   
+	for _, c := range path {
+		test_field := make([][]string, len(playing_field))
+		for i := range playing_field {
+			test_field[i] = make([]string, len(playing_field[i]))
+			copy(test_field[i], playing_field[i])
+		}
+
+		test_field[c.y][c.x] = "#"
+		if checkForLoop(test_field, player_pos) {
+			loops++
+		}
+	}
+	return loops
+}
+
+func checkForLoop(playing_field [][]string, player_pos coord) bool {
+	out_of_bound := false
+	// Starting Pos
+	visited_count := make(map[coord]int)
+
+	cell := "^"
+	pos := player_pos
+	dir := coord{0, -1}
+
+	for !out_of_bound {
+		cell, pos, dir = explore_next_step(playing_field, pos, dir)
+		if cell == "." {
+			visited_count[pos]++
+			if visited_count[pos] > 4 {
+				return true
+			}
+		} else if cell == "end" {
+			out_of_bound = true
+		}
+	}
+
+	return false
 }
 
 func main() {
-    playing_field := readInput()
-    fmt.Println("A:", countOccurences(playing_field, true))
-    fmt.Println("B:", countOccurences(playing_field, false))
-} 
+	cells, visited := a()
+	fmt.Println("A:", cells)
+
+	loops := testObstacles(visited)
+	fmt.Println("B:", loops)
+}
