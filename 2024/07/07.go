@@ -40,22 +40,18 @@ func eval(nums []int, res int, acc int, idx int) bool {
 	if idx == len(nums) {
 		return acc == res
 	}
-
 	// add
 	if eval(nums, res, acc+nums[idx], idx+1) {
 		return true
 	}
-
 	// mul
 	if eval(nums, res, acc*nums[idx], idx+1) {
 		return true
 	}
-
-	// concat
+	// part 2: concat
 	if eval(nums, res, concatNumbers(acc, nums[idx]), idx+1) {
 		return true
 	}
-
 	return false
 }
 
